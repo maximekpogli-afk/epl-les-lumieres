@@ -1,0 +1,13 @@
+import type { NextConfig } from "next"
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  },
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@base-ui/react"],
+  },
+}
+
+export default nextConfig
