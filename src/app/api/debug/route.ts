@@ -1,39 +1,65 @@
 export const GET = async () => {
-  const envCheck: Record<string, string> = {
-    TURSO_DATABASE_URL: process.env.TURSO_DATABASE_URL ? "SET (" + process.env.TURSO_DATABASE_URL.substring(0, 30) + "...)" : "NOT SET",
-    TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN ? "SET" : "NOT SET",
-    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? "SET" : "NOT SET",
-    VERCEL: process.env.VERCEL || "NOT SET",
-    VERCEL_URL: process.env.VERCEL_URL || "NOT SET",
-    NODE_ENV: process.env.NODE_ENV || "NOT SET",
+  const results: Record<string, any> = {}
+
+  // Test 1: import dynamique de Better Auth
+  try {
+    const { betterAuth } = await import("better-auth")
+    results.betterAuthImport = "OK"
+  } catch (e: unknown) {
+    results.betterAuthImport = "ERR: " + (e instanceof Error ? e.message : String(e))
   }
 
-  const moduleCheck: Record<string, string> = {}
+  // Test 2: import du handler
   try {
-    const mod = await import("@libsql/kysely-libsql")
-    moduleCheck.libsqlKysely = "OK: " + Object.keys(mod).join(",")
+    const { toNextJsHandler } = await import("better-auth/next-js")
+    results.nextJsHandlerImport = "OK"
   } catch (e: unknown) {
-    moduleCheck.libsqlKysely = "ERR: " + (e instanceof Error ? e.message : String(e))
-  }
-  try {
-    const mod = await import("kysely")
-    moduleCheck.kysely = "OK: " + Object.keys(mod).join(",")
-  } catch (e: unknown) {
-    moduleCheck.kysely = "ERR: " + (e instanceof Error ? e.message : String(e))
+    results.nextJsHandlerImport = "ERR: " + (e instanceof Error ? e.message : String(e))
   }
 
+  // Test 3: create Kysely + LibsqlDialect via dynamic import
   try {
-    const { createClient } = await import("@libsql/client")
-    const client = createClient({
-      url: process.env.TURSO_DATABASE_URL || "",
-      authToken: process.env.TURSO_AUTH_TOKEN,
+    const { LibsqlDialect } = await import("@libsql/kysely-libsql")
+    const { Kysely } = await import("kysely")
+    const kysely = new Kysely({
+      dialect: new LibsqlDialect({
+        url: process.env.TURSO_DATABASE_URL!,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      }),
     })
-    const result = await client.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    moduleCheck.tursoDirect = "OK - tables: " + result.rows.map(r => r.name).join(", ")
-    client.close()
+    const result = await kysely.selectFrom("user").selectAll().execute()
+    results.kyselyQuery = "OK - users: " + result.length
+    results.kyselyHasDb = "db" in ({ db: kysely, type: "sqlite" } as any) ? "YES" : "NO"
+    results.kyselyConstructorName = (kysely as any).constructor?.name || "unknown"
+    results.kyselyDialectType = typeof (kysely as any).dialect
+    results.kyselyDialectKeys = Object.keys((kysely as any).dialect || {}).join(",")
   } catch (e: unknown) {
-    moduleCheck.tursoDirect = "ERR: " + (e instanceof Error ? e.message : String(e))
+    results.kyselyTest = "ERR: " + (e instanceof Error ? e.stack || e.message : String(e))
   }
 
-  return Response.json({ envCheck, moduleCheck })
+  // Test 4: try creating Better Auth with Kysely wrapper
+  try {
+    const { betterAuth } = await import("better-auth")
+    const { LibsqlDialect } = await import("@libsql/kysely-libsql")
+    const { Kysely } = await import("kysely")
+    const kysely = new Kysely({
+      dialect: new LibsqlDialect({
+        url: process.env.TURSO_DATABASE_URL!,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      }),
+    })
+
+    const authInstance = betterAuth({
+      database: { db: kysely, type: "sqlite" },
+      baseURL: "https://epl-les-lumieres.vercel.app",
+      emailAndPassword: { enabled: true },
+    })
+    results.betterAuthCreate = "OK"
+    results.authType = typeof authInstance
+    results.authKeys = Object.keys(authInstance).join(",")
+  } catch (e: unknown) {
+    results.betterAuthCreate = "ERR: " + (e instanceof Error ? e.stack || e.message : String(e))
+  }
+
+  return Response.json(results, { status: 200 })
 }
