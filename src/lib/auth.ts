@@ -1,19 +1,20 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 
-async function createDb() {
+function createDb() {
   if (process.env.TURSO_DATABASE_URL) {
-    const { LibsqlDialect } = await import("@libsql/kysely-libsql")
-    const { Kysely } = await import("kysely")
-    return new Kysely({
+    const { LibsqlDialect } = require("@libsql/kysely-libsql")
+    const { Kysely } = require("kysely")
+    const kysely = new Kysely({
       dialect: new LibsqlDialect({
         url: process.env.TURSO_DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN,
       }),
     })
+    return { db: kysely, type: "sqlite" as const }
   }
 
-  const { default: Database } = await import("better-sqlite3")
+  const Database = require("better-sqlite3")
   const sqlite = new Database("./epl.db")
   sqlite.pragma("journal_mode = WAL")
 
@@ -67,7 +68,7 @@ async function createDb() {
   return sqlite
 }
 
-const db = await createDb()
+const db = createDb()
 
 export const auth = betterAuth({
   database: db,
