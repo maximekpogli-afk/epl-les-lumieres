@@ -1,9 +1,10 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import React from "react"
 import type { Profile } from "@/types"
+import { authClient } from "@/lib/auth-client"
 
 interface AuthContextType {
   profile: Profile | null
@@ -19,62 +20,66 @@ export function useAuth() {
   return useContext(AuthContext)
 }
 
-const DEMO_PROFILE: Profile = {
-  id: "1",
-  email: "admin@epl-lumieres.local",
-  first_name: "Admin",
-  last_name: "System",
-  role: "admin" as any,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  useEffect(() => {
-    const stored = localStorage.getItem("epl_auth")
-    if (stored) {
-      try {
-        setProfile(JSON.parse(stored))
-      } catch {
-        localStorage.removeItem("epl_auth")
+  const loadSession = useCallback(async () => {
+    try {
+      const { data } = await authClient.getSession()
+      if (data?.user) {
+        setProfile({
+          id: data.user.id,
+          email: data.user.email,
+          first_name: data.user.name || "",
+          last_name: "",
+          role: "admin" as any,
+          created_at: data.user.createdAt?.toISOString() || new Date().toISOString(),
+          updated_at: data.user.updatedAt?.toISOString() || new Date().toISOString(),
+        })
+      } else {
+        setProfile(null)
       }
+    } catch {
+      setProfile(null)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
+  useEffect(() => {
+    loadSession()
+  }, [loadSession])
+
   const signIn = async (email: string, password: string) => {
-    if (email === "admin@epl-lumieres.local" && password === "admin123") {
-      const p = { ...DEMO_PROFILE, email }
-      setProfile(p)
-      localStorage.setItem("epl_auth", JSON.stringify(p))
-      router.push("/dashboard")
-    } else {
-      throw new Error("Email ou mot de passe incorrect")
+    const { error } = await authClient.signIn.email({
+      email,
+      password,
+    })
+    if (error) {
+      throw new Error(error.message || "Email ou mot de passe incorrect")
     }
+    await loadSession()
+    router.push("/dashboard")
   }
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string, role: string) => {
-    const p: Profile = {
-      id: Date.now().toString(),
+  const signUp = async (email: string, password: string, firstName: string, lastName: string, _role: string) => {
+    const { error } = await authClient.signUp.email({
       email,
-      first_name: firstName,
-      last_name: lastName,
-      role: role as any,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      password,
+      name: `${firstName} ${lastName}`,
+    })
+    if (error) {
+      throw new Error(error.message || "Erreur d'inscription")
     }
-    setProfile(p)
-    localStorage.setItem("epl_auth", JSON.stringify(p))
+    await loadSession()
     router.push("/dashboard")
   }
 
   const signOut = async () => {
+    await authClient.signOut()
     setProfile(null)
-    localStorage.removeItem("epl_auth")
     router.push("/auth/login")
   }
 
