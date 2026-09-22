@@ -1,20 +1,14 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
+import { createClient } from "@libsql/client"
 
-let _db: any = null
-
-function getDb() {
-  if (_db) return _db
-  const { createClient } = require("@libsql/client")
-  _db = createClient({
-    url: process.env.TURSO_DATABASE_URL,
-    authToken: process.env.TURSO_AUTH_TOKEN,
-  })
-  return _db
-}
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL || "file:local.db",
+  authToken: process.env.TURSO_AUTH_TOKEN || undefined,
+})
 
 export const auth = betterAuth({
-  database: getDb(),
+  database: db,
   baseURL: process.env.BETTER_AUTH_URL || (process.env.VERCEL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"),
   emailAndPassword: {
     enabled: true,
