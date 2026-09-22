@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "@base-ui/react"],
   },
+  serverExternalPackages: ["better-sqlite3", "@libsql/client", "@libsql/kysely-libsql"],
 }
 
 export default nextConfig

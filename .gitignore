@@ -40,5 +40,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-.env*
+# local database
+*.db
+*.db-shm
+*.db-wal
+
+# test files
+test-*.cjs
+test-*.ps1
+create-tables.cjs
+setup-turso.cjs
+start-server.ps1
+server-*.log
