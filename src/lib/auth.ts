@@ -1,19 +1,19 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 
-let db: any = null
+async function createDb() {
+  if (process.env.TURSO_DATABASE_URL) {
+    const { LibsqlDialect } = await import("@libsql/kysely-libsql")
+    const { Kysely } = await import("kysely")
+    return new Kysely({
+      dialect: new LibsqlDialect({
+        url: process.env.TURSO_DATABASE_URL,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      }),
+    })
+  }
 
-if (process.env.TURSO_DATABASE_URL) {
-  const { LibsqlDialect } = require("@libsql/kysely-libsql")
-  const { Kysely } = require("kysely")
-  db = new Kysely({
-    dialect: new LibsqlDialect({
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    }),
-  })
-} else {
-  const Database = require("better-sqlite3")
+  const { default: Database } = await import("better-sqlite3")
   const sqlite = new Database("./epl.db")
   sqlite.pragma("journal_mode = WAL")
 
@@ -64,8 +64,10 @@ if (process.env.TURSO_DATABASE_URL) {
     CREATE UNIQUE INDEX IF NOT EXISTS "session_token_idx" ON "session" ("token");
   `)
 
-  db = sqlite
+  return sqlite
 }
+
+const db = await createDb()
 
 export const auth = betterAuth({
   database: db,
