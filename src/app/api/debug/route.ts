@@ -1,3 +1,5 @@
+import { sql } from "kysely"
+
 export const GET = async () => {
   const results: Record<string, string> = {}
 
@@ -10,13 +12,12 @@ export const GET = async () => {
         authToken: process.env.TURSO_AUTH_TOKEN,
       }),
     })
-    const result = await kysely.selectFrom("user").selectAll().execute()
-    results.kyselyQuery = "OK - users: " + result.length
+    const result = await sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type='table'`.execute(kysely)
+    results.tables = result.rows.map(r => r.name).join(", ")
 
     const wrapper = { db: kysely, type: "sqlite" }
     results.hasDbProp = "db" in wrapper ? "YES" : "NO"
     results.dbPropType = typeof wrapper.db
-    results.dbPropConstructor = (wrapper.db as any).constructor?.name || "unknown"
   } catch (e: unknown) {
     results.kyselyTest = "ERR: " + (e instanceof Error ? e.message : String(e))
   }
