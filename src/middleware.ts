@@ -11,7 +11,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const sessionToken = request.cookies.get("better-auth.session_token")?.value
+  const sessionToken = request.cookies.get("__Secure-better-auth.session_token")?.value
+    || request.cookies.get("better-auth.session_token")?.value
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route))
   const isAuth = authRoutes.some((route) => pathname.startsWith(route))
 
